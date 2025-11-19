@@ -1,14 +1,15 @@
 """Login test configs"""
 
-from fastapi.testclient import TestClient
-from Src.login_service.login import app, get_db
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from Src.login_service.login import app, get_db
 from Src.login_service.models import Base
+from sqlalchemy.pool import StaticPool
 
 TEST_DB_URL = "sqlite+pysqlite:///:memory:"
-engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
+engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool)
 TestingSessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 Base.metadata.create_all(bind=engine)
 
@@ -21,7 +22,7 @@ def client():
             yield db
         finally:
             db.close()
-            app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         # hand the client to the test
         yield c
