@@ -1,11 +1,11 @@
-"""Profile test configs"""
+"""Login test configs"""
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from Src.banking_service.banking import app, get_db
-from Src.banking_service.models import Base
+from login_service.login import app, get_db
+from login_service.models import Base
 from sqlalchemy.pool import StaticPool
 
 TEST_DB_URL = "sqlite+pysqlite:///:memory:"
@@ -15,6 +15,7 @@ Base.metadata.create_all(bind=engine)
 
 @pytest.fixture
 def client():
+    """Creates a new instance of App"""
     def override_get_db():
         db = TestingSessionLocal()
         try:
