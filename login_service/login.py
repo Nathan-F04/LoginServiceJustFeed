@@ -1,6 +1,7 @@
 """Module for the login service"""
 
 from fastapi import FastAPI, HTTPException, status, Depends, Response
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
@@ -12,6 +13,18 @@ from .schemas import (
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
+
+origins = [
+    "http://localhost:3000",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def get_db():
     db = SessionLocal()
@@ -58,7 +71,7 @@ def get_user_login(payload: AccountLogin, db: Session = Depends(get_db)):
     if not account:
         raise HTTPException(status_code=404, detail="Incorrect Email")
     if payload_data.password == account.password:
-        return "login Successful"
+        return {"id": account.id, "response": "login Successful"}
     raise HTTPException(status_code=400, detail="Incorrect Password")
 
 @app.delete("/api/login/delete/{account_id}")
