@@ -1,5 +1,8 @@
 """Module for the login service"""
 
+import json
+import os
+import aio_pika
 from fastapi import FastAPI, HTTPException, status, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -14,6 +17,10 @@ from .schemas import (
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
 
+#Rabbit MQ
+EXCHANGE_NAME = "just_feed_exchange"
+RABBIT_URL = os.getenv("RABBIT_URL")
+
 origins = [
     "http://localhost:3000",
 ]
@@ -26,7 +33,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+async def get_exchange():
+    """
+    Open a connection, create a channel and declare a topic exchange.
+    Returns (connection, channel, exchange).
+    """
+    conn = await aio_pika.connect_robust(RABBIT_URL)
+    ch = await conn.channel()
+    ex = await ch.declare_exchange(EXCHANGE_NAME, aio_pika.ExchangeType.TOPIC)
+    return conn, ch, ex
+
 def get_db():
+    """Opens and closes db connection for endpoints"""
     db = SessionLocal()
     try:
         yield db
@@ -44,6 +62,7 @@ def get_account_details_by_id(account_id: int, db: Session = Depends(get_db)):
 #List all account (For Debuging)
 @app.get("/api/login/view", response_model=list[AccountRead])
 def get_all_bank_accounts(db: Session = Depends(get_db)):
+    """Method for getting all accounts"""
     stmt = select(AccountDB).order_by(AccountDB.id)
     result = db.execute(stmt)
     account_list = result.scalars().all()
@@ -75,7 +94,7 @@ def get_user_login(payload: AccountLogin, db: Session = Depends(get_db)):
     raise HTTPException(status_code=400, detail="Incorrect Password")
 
 @app.delete("/api/login/delete/{account_id}")
-def get_user_login(account_id: int, db: Session = Depends(get_db)) -> Response:
+def delete_user_login(account_id: int, db: Session = Depends(get_db)) -> Response:
     """Deletes a user from the database"""
     account = db.get(AccountDB, account_id)
     if not account:
@@ -85,20 +104,26 @@ def get_user_login(account_id: int, db: Session = Depends(get_db)) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.patch("/api/login/patch/{account_id}", response_model=AccountRead)
-def partial_edit_login_details(account_id: int, payload: AccountPartialUpdate, db: Session = Depends(get_db)):
+async def partial_edit_login_details(account_id: int, payload: AccountPartialUpdate, db: Session = Depends(get_db)):
     """Edit email, username, or password"""
     account = db.query(AccountDB).filter(AccountDB.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
-    
+
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(account, key, value)
-    
+
     try:
         db.add(account)
         db.commit()
         db.refresh(account)
     except IntegrityError:
         db.rollback()
+
+    #Queue Logic
+    conn, ch, ex = await get_exchange()
+    msg = aio_pika.Message(body=json.dumps("Account edited successfully").encode())
+    await ex.publish(msg, routing_key="account.edit")
+    await conn.close()
     return account
