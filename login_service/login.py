@@ -94,13 +94,18 @@ def get_user_login(payload: AccountLogin, db: Session = Depends(get_db)):
     raise HTTPException(status_code=400, detail="Incorrect Password")
 
 @app.delete("/api/login/delete/{account_id}")
-def delete_user_login(account_id: int, db: Session = Depends(get_db)) -> Response:
+async def delete_user_login(account_id: int, db: Session = Depends(get_db)) -> Response:
     """Deletes a user from the database"""
     account = db.get(AccountDB, account_id)
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     db.delete(account)
     db.commit()
+    #Queue Logic
+    conn, ch, ex = await get_exchange()
+    msg = aio_pika.Message(body=json.dumps("Account deleted successfully").encode())
+    await ex.publish(msg, routing_key="account.delete")
+    await conn.close()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.patch("/api/login/patch/{account_id}", response_model=AccountRead)

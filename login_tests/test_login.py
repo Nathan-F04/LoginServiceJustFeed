@@ -38,14 +38,30 @@ def test_login_404(client):
     result = client.post("/api/login/sign-in", json={"email": "john@eample.com", "password": "password"})
     assert result.status_code == 404
 
-def test_login_delete_ok(client):
+@patch('login_service.login.get_exchange')
+def test_login_delete_ok(mock_get_exchange, client):
     """Delete an account test"""
     client.post("/api/login/sign-in", json={"email": "john@eample.com", "password": "password"})
+
+    # Mock RabbitMQ for the DELETE request
+    mock_conn = AsyncMock()
+    mock_ch = AsyncMock()
+    mock_ex = AsyncMock()
+    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
+
     result = client.delete("/api/login/delete/1")
     assert result.status_code == 204
 
-def test_login_delete_404(client):
+@patch('login_service.login.get_exchange')
+def test_login_delete_404(mock_get_exchange, client):
     """Delete shouldn't delete a non-existent account"""
+    
+    # Mock RabbitMQ for the DELETE request
+    mock_conn = AsyncMock()
+    mock_ch = AsyncMock()
+    mock_ex = AsyncMock()
+    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
+
     result = client.delete("/api/login/delete/2")
     assert result.status_code == 404
 
@@ -89,6 +105,7 @@ def test_login_partial_update_ok(mock_get_exchange, client):
     mock_ch = AsyncMock()
     mock_ex = AsyncMock()
     mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
+
     result = client.patch("/api/login/patch/1", json={"password": "password123"})
     assert result.status_code == 200
     data = result.json()
@@ -102,10 +119,12 @@ def test_login_partial_update_ok(mock_get_exchange, client):
 @patch('login_service.login.get_exchange')
 def test_login_partial_update_404(mock_get_exchange, client):
     """Test login details without an account"""
-    # Mock RabbitMQ for the POST request
+
+    # Mock RabbitMQ for the PATCH request
     mock_conn = AsyncMock()
     mock_ch = AsyncMock()
     mock_ex = AsyncMock()
     mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
+
     result = client.patch("/api/login/patch/2", json={"password": "password123"})
     assert result.status_code == 404
