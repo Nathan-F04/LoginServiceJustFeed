@@ -69,7 +69,7 @@ def get_all_bank_accounts(db: Session = Depends(get_db)):
     return account_list
 
 @app.post("/api/login/sign-up", response_model=AccountRead, status_code=status.HTTP_201_CREATED)
-def add_user(payload: AccountCreate, db: Session = Depends(get_db)):
+async def add_user(payload: AccountCreate, db: Session = Depends(get_db)):
     """Sign In method to create an account"""
     account = AccountDB(**payload.model_dump())
     db.add(account)
@@ -79,6 +79,12 @@ def add_user(payload: AccountCreate, db: Session = Depends(get_db)):
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=409, detail="Account already exists")
+
+    #Queue Logic
+    conn, ch, ex = await get_exchange()
+    msg = aio_pika.Message(body=json.dumps("Account created successfully").encode())
+    await ex.publish(msg, routing_key="account.create")
+    await conn.close()
     return account
 
 @app.post("/api/login/sign-in")
@@ -101,6 +107,7 @@ async def delete_user_login(account_id: int, db: Session = Depends(get_db)) -> R
         raise HTTPException(status_code=404, detail="Account not found")
     db.delete(account)
     db.commit()
+
     #Queue Logic
     conn, ch, ex = await get_exchange()
     msg = aio_pika.Message(body=json.dumps("Account deleted successfully").encode())
