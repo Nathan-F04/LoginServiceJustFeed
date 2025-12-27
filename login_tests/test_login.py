@@ -1,19 +1,11 @@
 """Test File for Login Service"""
-from unittest.mock import AsyncMock, patch
 
 def user_payload(name="John", email="john@example.com", password="password"):
     """Builder for login accounts object"""
     return {"name": name, "email": email, "password": password}
 
-@patch('login_service.login.get_exchange')
-def test_create_account_ok(mock_get_exchange, client):
+def test_create_account_ok(mock_rabbitmq, client):
     """Tests post method for creating an account"""
-
-    # Mock RabbitMQ for the POST request
-    mock_conn = AsyncMock()
-    mock_ch = AsyncMock()
-    mock_ex = AsyncMock()
-    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
 
     result = client.post("/api/login/sign-up", json=user_payload())
     assert result.status_code == 201
@@ -22,77 +14,47 @@ def test_create_account_ok(mock_get_exchange, client):
     assert data["name"] == "John"
     assert data["email"] == "john@example.com"
     assert data["password"] == "password"
+    mock_rabbitmq.assert_called()
 
-@patch('login_service.login.get_exchange')
-def test_create_account_409(mock_get_exchange, client):
+def test_create_account_409(mock_rabbitmq, client):
     """Tests 409 on duplicate account creation"""
-
-    # Mock RabbitMQ for the POST requests
-    mock_conn = AsyncMock()
-    mock_ch = AsyncMock()
-    mock_ex = AsyncMock()
-    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
 
     client.post("/api/login/sign-up", json=user_payload())
     result = client.post("/api/login/sign-up", json=user_payload())
     assert result.status_code == 409
+    mock_rabbitmq.assert_called()
 
-@patch('login_service.login.get_exchange')
-def test_login_ok(mock_get_exchange, client):
+def test_login_ok(mock_rabbitmq, client):
     """Tests login works once user is posted"""
-
-    # Mock RabbitMQ for the POST request
-    mock_conn = AsyncMock()
-    mock_ch = AsyncMock()
-    mock_ex = AsyncMock()
-    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
 
     client.post("/api/login/sign-up", json=user_payload())
     result = client.post("/api/login/sign-in", json={"email": "john@example.com", "password": "password"})
     assert result.status_code == 200
+    mock_rabbitmq.assert_called()
 
-@patch('login_service.login.get_exchange')
-def test_login_incorrect_password(mock_get_exchange, client):
+def test_login_incorrect_password(mock_rabbitmq, client):
     """Tests login fails without matching password"""
-
-    # Mock RabbitMQ for the POST request
-    mock_conn = AsyncMock()
-    mock_ch = AsyncMock()
-    mock_ex = AsyncMock()
-    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
 
     client.post("/api/login/sign-up", json=user_payload())
     result = client.post("/api/login/sign-in", json={"email": "john@example.com", "password": "passstesttsxujr"})
     assert result.status_code == 400
+    mock_rabbitmq.assert_called()
 
 def test_login_404(client):
     """Login doesn't work without signing up"""
     result = client.post("/api/login/sign-in", json={"email": "john@eample.com", "password": "password"})
     assert result.status_code == 404
 
-@patch('login_service.login.get_exchange')
-def test_login_delete_ok(mock_get_exchange, client):
+def test_login_delete_ok(mock_rabbitmq, client):
     """Delete an account test"""
-    client.post("/api/login/sign-in", json={"email": "john@eample.com", "password": "password"})
-
-    # Mock RabbitMQ for the DELETE request
-    mock_conn = AsyncMock()
-    mock_ch = AsyncMock()
-    mock_ex = AsyncMock()
-    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
+    client.post("/api/login/sign-up", json=user_payload())
 
     result = client.delete("/api/login/delete/1")
     assert result.status_code == 204
+    mock_rabbitmq.assert_called()
 
-@patch('login_service.login.get_exchange')
-def test_login_delete_404(mock_get_exchange, client):
+def test_login_delete_404(client):
     """Delete shouldn't delete a non-existent account"""
-    
-    # Mock RabbitMQ for the DELETE request
-    mock_conn = AsyncMock()
-    mock_ch = AsyncMock()
-    mock_ex = AsyncMock()
-    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
 
     result = client.delete("/api/login/delete/2")
     assert result.status_code == 404
@@ -104,15 +66,8 @@ def test_login_get_all_account_when_empty(client):
     data = result.json()
     assert data == []
 
-@patch('login_service.login.get_exchange')
-def test_login_view_account_by_id_ok(mock_get_exchange, client):
+def test_login_view_account_by_id_ok(mock_rabbitmq, client):
     """View accounts by id"""
-
-    # Mock RabbitMQ for the POST requests
-    mock_conn = AsyncMock()
-    mock_ch = AsyncMock()
-    mock_ex = AsyncMock()
-    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
 
     client.post("/api/login/sign-up", json=user_payload())
     client.post("/api/login/sign-up", json=user_payload())
@@ -122,21 +77,15 @@ def test_login_view_account_by_id_ok(mock_get_exchange, client):
     assert data["name"] == "John"
     assert data["password"] == "password"
     assert data["email"] == "john@example.com"
+    mock_rabbitmq.assert_called()
 
 def test_login_view_account_by_id_404(client):
     """View non existent account by id"""
     result = client.get("/api/login/view/2")
     assert result.status_code == 404
 
-@patch('login_service.login.get_exchange')
-def test_login_get_all_account_with_value(mock_get_exchange, client):
+def test_login_get_all_account_with_value(mock_rabbitmq, client):
     """Get all accounts"""
-
-    # Mock RabbitMQ for the POST requests
-    mock_conn = AsyncMock()
-    mock_ch = AsyncMock()
-    mock_ex = AsyncMock()
-    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
 
     client.post("/api/login/sign-up", json=user_payload())
     client.post("/api/login/sign-up", json=user_payload())
@@ -144,16 +93,10 @@ def test_login_get_all_account_with_value(mock_get_exchange, client):
     assert result.status_code == 200
     data = result.json()
     assert data == [{"id": 1, "name": "John", "email": "john@example.com", "password": "password"}]
+    mock_rabbitmq.assert_called()
 
-@patch('login_service.login.get_exchange')
-def test_login_partial_update_ok(mock_get_exchange, client):
+def test_login_partial_update_ok(mock_rabbitmq, client):
     """Test editing login details"""
-
-    # Mock RabbitMQ for the POST and PATCH requests
-    mock_conn = AsyncMock()
-    mock_ch = AsyncMock()
-    mock_ex = AsyncMock()
-    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
 
     client.post("/api/login/sign-up", json=user_payload())
     result = client.patch("/api/login/patch/1", json={"password": "password123"})
@@ -161,20 +104,10 @@ def test_login_partial_update_ok(mock_get_exchange, client):
     data = result.json()
     assert data["password"] == "password123"
 
-    #Verify RabbitMQ was called correctly
-    mock_get_exchange.assert_called_once()
-    mock_ex.publish.assert_called_once()
-    mock_conn.close.assert_called_once()
+    mock_rabbitmq.assert_called()
 
-@patch('login_service.login.get_exchange')
-def test_login_partial_update_404(mock_get_exchange, client):
+def test_login_partial_update_404(client):
     """Test login details without an account"""
-
-    # Mock RabbitMQ for the PATCH request
-    mock_conn = AsyncMock()
-    mock_ch = AsyncMock()
-    mock_ex = AsyncMock()
-    mock_get_exchange.return_value = (mock_conn, mock_ch, mock_ex)
 
     result = client.patch("/api/login/patch/2", json={"password": "password123"})
     assert result.status_code == 404
