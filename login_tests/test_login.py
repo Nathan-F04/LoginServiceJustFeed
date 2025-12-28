@@ -53,11 +53,12 @@ def test_login_delete_ok(mock_rabbitmq, client):
     assert result.status_code == 204
     mock_rabbitmq.assert_called()
 
-def test_login_delete_404(client):
+def test_login_delete_404(mock_rabbitmq, client):
     """Delete shouldn't delete a non-existent account"""
 
     result = client.delete("/api/login/delete/2")
     assert result.status_code == 404
+    mock_rabbitmq.assert_called()
 
 def test_login_get_all_account_when_empty(client):
     """Get all accounts when none exist"""
@@ -103,11 +104,11 @@ def test_login_partial_update_ok(mock_rabbitmq, client):
     assert result.status_code == 200
     data = result.json()
     assert data["password"] == "password123"
-
     mock_rabbitmq.assert_called()
 
-def test_login_partial_update_404(client):
+def test_login_partial_update_404(mock_rabbitmq, client):
     """Test login details without an account"""
 
     result = client.patch("/api/login/patch/2", json={"password": "password123"})
     assert result.status_code == 404
+    mock_rabbitmq.assert_called()
