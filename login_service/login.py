@@ -59,7 +59,6 @@ def get_account_details_by_id(account_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="bank account not found")
     return account
 
-#List all account (For Debuging)
 @app.get("/api/login/view", response_model=list[AccountRead])
 def get_all_bank_accounts(db: Session = Depends(get_db)):
     """Method for getting all accounts"""
@@ -73,15 +72,18 @@ async def add_user(payload: AccountCreate, db: Session = Depends(get_db)):
     """Sign In method to create an account"""
     account = AccountDB(**payload.model_dump())
     db.add(account)
+    conn, ch, ex = await get_exchange()
+
     try:
         db.commit()
         db.refresh(account)
     except IntegrityError:
         db.rollback()
+        msg = aio_pika.Message(body=json.dumps("Account couldn't be created successfully").encode())
+        await ex.publish(msg, routing_key="account.create")
+        await conn.close()
         raise HTTPException(status_code=409, detail="Account already exists")
 
-    #Queue Logic
-    conn, ch, ex = await get_exchange()
     msg = aio_pika.Message(body=json.dumps("Account created successfully").encode())
     await ex.publish(msg, routing_key="account.create")
     await conn.close()
@@ -103,13 +105,16 @@ def get_user_login(payload: AccountLogin, db: Session = Depends(get_db)):
 async def delete_user_login(account_id: int, db: Session = Depends(get_db)) -> Response:
     """Deletes a user from the database"""
     account = db.get(AccountDB, account_id)
+    conn, ch, ex = await get_exchange()
+
     if not account:
+        msg = aio_pika.Message(body=json.dumps("Account couldn't be deleted successfully").encode())
+        await ex.publish(msg, routing_key="account.delete")
+        await conn.close()
         raise HTTPException(status_code=404, detail="Account not found")
     db.delete(account)
     db.commit()
 
-    #Queue Logic
-    conn, ch, ex = await get_exchange()
     msg = aio_pika.Message(body=json.dumps("Account deleted successfully").encode())
     await ex.publish(msg, routing_key="account.delete")
     await conn.close()
@@ -119,22 +124,28 @@ async def delete_user_login(account_id: int, db: Session = Depends(get_db)) -> R
 async def partial_edit_login_details(account_id: int, payload: AccountPartialUpdate, db: Session = Depends(get_db)):
     """Edit email, username, or password"""
     account = db.query(AccountDB).filter(AccountDB.id == account_id).first()
+    conn, ch, ex = await get_exchange()
+
     if not account:
+        msg = aio_pika.Message(body=json.dumps("Account couldn't be edited successfully").encode())
+        await ex.publish(msg, routing_key="account.edit")
+        await conn.close()
         raise HTTPException(status_code=404, detail="Account not found")
 
     update_data = payload.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(account, key, value)
-
     try:
         db.add(account)
         db.commit()
         db.refresh(account)
     except IntegrityError:
         db.rollback()
+        msg = aio_pika.Message(body=json.dumps("Account couldn't be edited successfully").encode())
+        await ex.publish(msg, routing_key="account.edit")
+        await conn.close()
+        raise HTTPException(status_code=409, detail="Conflict")
 
-    #Queue Logic
-    conn, ch, ex = await get_exchange()
     msg = aio_pika.Message(body=json.dumps("Account edited successfully").encode())
     await ex.publish(msg, routing_key="account.edit")
     await conn.close()
