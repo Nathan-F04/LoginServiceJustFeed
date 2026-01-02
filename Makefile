@@ -9,7 +9,7 @@ freeze:
 	pip freeze > requirements.txt
 
 run:
-	python -m uvicorn login_service.login:app --host localhost --port 8001 --reload
+	python -m uvicorn $(LOGIN_APP) --host 0.0.0.0 --port 8001 --reload
 
 start:
 	nohup python -m uvicorn $(LOGIN_APP) --host 0.0.0.0 --port 8001 --reload \
