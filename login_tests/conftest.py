@@ -1,13 +1,13 @@
 """Profile test configs"""
 
-import pytest
 from unittest.mock import AsyncMock, patch
-from fastapi.testclient import TestClient
+from sqlalchemy.pool import StaticPool
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import pytest
+from fastapi.testclient import TestClient
 from login_service.login import app, get_db
 from login_service.models import Base
-from sqlalchemy.pool import StaticPool
 
 TEST_DB_URL = "sqlite+pysqlite:///:memory:"
 engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False}, poolclass=StaticPool)
@@ -16,6 +16,7 @@ Base.metadata.create_all(bind=engine)
 
 @pytest.fixture
 def client():
+    """Client"""
     def override_get_db():
         db = TestingSessionLocal()
         try:
