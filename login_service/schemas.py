@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr, ConfigDict, StringConstraints
 
 # ---------- Reusable type aliases ----------
 NameStr = Annotated[str, StringConstraints(min_length=2, max_length=25)]
-PasswordStr = Annotated[str, StringConstraints(min_length=5, max_length=50, pattern=r"[a-z]")]
+PasswordStr = Annotated[str, StringConstraints(min_length=5, max_length=50)]
 
 class Account(BaseModel):
     """Json input vailidation for Accounts"""
@@ -16,21 +16,25 @@ class Account(BaseModel):
 
 # ---------- Accounts ----------
 class AccountCreate(BaseModel):
+    """For creating account"""
     name: NameStr
     email: EmailStr
     password: PasswordStr
 
 class AccountLogin(BaseModel):
+    """For logging into the account"""
     email: EmailStr
     password: PasswordStr
 
 class AccountPartialUpdate(BaseModel):
+    """Partial update"""
     model_config = ConfigDict(from_attributes=True)
     name: Optional[NameStr] = None
     email: Optional[EmailStr] = None
     password: Optional[PasswordStr] = None
 
 class AccountRead(BaseModel):
+    """Read account"""
     model_config = ConfigDict(from_attributes=True)
     id: int
     name: NameStr
